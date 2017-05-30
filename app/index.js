@@ -94,12 +94,11 @@ GameFactory = {
         let methods = ['L', 'J', 'S', 'Z', 'T', 'O', 'I'];
         let rand_index = Math.round((methods.length)*Math.random()-0.5000000000000001);
         let result = this[methods[rand_index]](x,y);
-        result.density = .1;
         result.frictionAir = .25;
-        result.friction = .6;
-        result.mass = 10;
+        result.friction = .1;
         result.isStatic = true;
-        result.restitution = .5;
+        result.density = .01;
+        result.restitution = 0.01;
         return result;
     }
 };
@@ -107,15 +106,22 @@ GameFactory = {
 
 
 // add all of the bodies to the world
+let floor = Bodies.rectangle(200, 600, 300, 50.5, { isStatic: true });
+let sensor_piece_out = Bodies.rectangle(400, 710, 850, 20, { isSensor: true, isStatic: true });
+floor.friction = 10;
 World.add(engine.world, [
-    Bodies.rectangle(200, 600, 300, 50.5, { isStatic: true })
+    floor,
+    sensor_piece_out
 ]);
 
 // engine.gravity.y = 0;
 
-let next_piece, piece, py;
+let next_piece, piece;
 
 function next() {
+    if (piece) {
+        piece.density = 0.95;
+    }
 
     if (next_piece) {
         Body.setPosition(next_piece, {x: 100, y: 100 });
@@ -128,14 +134,35 @@ function next() {
     World.add(engine.world, [next_piece]);
 }
 
+
+let count_piece_out = 0;
 Matter.Events.on(engine, 'collisionStart', function(event) {
     event.pairs.forEach(pair=> {
-            if (pair.bodyA.parent === piece || pair.bodyB.parent === piece) {
-                next()
-            }
+        if (pair.bodyA === sensor_piece_out) {
+            if (pair.bodyB.parent.out) return;
+
+            pair.bodyB.parent.out = true;
+            ++count_piece_out;
+            count_piece_out === 3 && lose();
         }
-    )
+        else if (pair.bodyB === sensor_piece_out) {
+            if (pair.bodyA.parent.out) return;
+
+            pair.bodyA.parent.out = true;
+            ++count_piece_out;
+            count_piece_out === 3 && lose();
+        }
+        if (pair.bodyA.parent === piece || pair.bodyB.parent === piece) {
+            Body.setVelocity(piece, {x: 0, y:0});
+            count_piece_out !== 3 && next()
+        }
+
+    })
 });
+
+function lose() {
+    window.location.reload();
+}
 
 let down = [];
 let down_interval = [];
@@ -147,7 +174,6 @@ function hit(left) {
 }
 document.addEventListener('keydown', function (event) {
     const code = event.keyCode;
-    console.log(code);
     if (down[code] === 1) return;
     if (code === 39) {
         if (event.ctrlKey) return hit();
@@ -176,6 +202,10 @@ document.addEventListener('keyup', function (event) {
 
     if (code === 40) {
         piece.frictionAir = 0.25;
+    } else if (code === 39) {
+        Body.setVelocity(piece, { x: 0, y: piece.velocity.y });
+    } else if (code === 37) {
+        Body.setVelocity(piece, { x: 0, y: piece.velocity.y });
     }
 });
 
